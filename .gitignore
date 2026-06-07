@@ -1,1 +1,2 @@
-*terraform*
+/infra/terraform/ec2Form/*terraform*
+/infra/terraform/kubeForm/*terraform*

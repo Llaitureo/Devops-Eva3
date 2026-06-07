@@ -3,10 +3,10 @@ name: CI/CD Pipeline
 on:
   push:
     branches:
-      - deploy
+    # - deploy
   pull_request:
     branches:
-      - deploy
+    # - deploy
 # jobs: trabajos a ejecutar
 jobs:
   # =================================== #

@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-despacho
+  labels:
+    app: frontend-despacho
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend-despacho
+  template:
+    metadata:
+      labels:
+        app: frontend-despacho
+    spec:
+      containers:
+        - name: frontend-despacho
+          image: imagen-frontend
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8083
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-despacho
+spec:
+  selector:
+    app: frontend-despacho
+  ports:
+    - port: 8083
+      targetPort: 8083
+      nodePort: 30080
+  type: LoadBalancer

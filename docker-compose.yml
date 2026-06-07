@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8
+    container_name: innovatech-project-mysql-1
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD_R:-root}
+      MYSQL_DATABASE: ${DB_NAME:-innovatech_db}
+      MYSQL_USER: ${DB_USERNAME:-innovatech_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-innovatech_pass}
+    expose:
+      - "3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${DB_PASSWORD_R:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - back-net
+
+  backend-ventas:
+    image: ${AWS_ECR_REGISTRY}/innovatech-ventas:latest
+    container_name: innovatech-project-backend-ventas
+    ports:
+      - "8081:8081"
+    user: "${CURRENT_UID:-1000}:${CURRENT_GID:-1000}"
+    environment:
+      DATASOURCE_URL: jdbc:mysql://mysql:3306/${DB_NAME:-innovatech_db}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&createDatabaseIfNotExist=true
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-innovatech_db}
+      DB_USERNAME: ${DB_USERNAME:-innovatech_user}
+      DB_PASSWORD: ${DB_PASSWORD:-innovatech_pass}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/swagger-ui.html"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    networks:
+      - back-net
+  backend-despachos:
+    image: ${AWS_ECR_REGISTRY}/innovatech-despachos:latest
+    container_name: innovatech-project-backend-despachos
+    ports:
+      - "8082:8082"
+    user: "${CURRENT_UID:-1000}:${CURRENT_GID:-1000}"
+    environment:
+      DATASOURCE_URL: jdbc:mysql://mysql:3306/${DB_NAME:-innovatech_db}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&createDatabaseIfNotExist=true
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-innovatech_db}
+      DB_USERNAME: ${DB_USERNAME:-innovatech_user}
+      DB_PASSWORD: ${DB_PASSWORD:-innovatech_pass}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      backend-ventas:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/swagger-ui.html"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    networks:
+      - back-net
+volumes:
+  mysql_data:
+
+networks:
+  back-net:
+    driver: bridge

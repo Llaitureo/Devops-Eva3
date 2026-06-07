@@ -1,0 +1,291 @@
+name: CI/CD Pipeline
+# Acciones que ejecutan el archivo
+on:
+  push:
+    branches:
+      - deploy
+  pull_request:
+    branches:
+      - deploy
+# jobs: trabajos a ejecutar
+jobs:
+  # =================================== #
+  # FASE 1: INTEGRACIÓN - FRONT-TESTING #
+  # =================================== #
+  front-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./front_despacho
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install dependencies
+      run: npm install --include=dev
+
+    - name: Ejecutar tests del frontend
+      env:
+        CI: true
+      run: npm run test
+  # ================= #
+  # FRONTEND BUILDING #
+  # ================= #
+  front-build:
+    needs: front-test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./front_despacho
+    steps:
+      - name: Checkout repository (git clone)
+        uses: actions/checkout@v4
+
+      - name: Setup node (instalar node)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm install --include=dev
+      
+      - name: run build
+        run: npm run build
+  # ====================== #
+  # BACKEND VENTAS TESTING #
+  # ====================== #
+  back-Venta-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./back-Ventas_SpringBoot/Springboot-API-REST
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: innovatech_ventas_db
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+    steps:
+      - name: Checkout repository (git clone)
+        uses: actions/checkout@v4
+      - name: Config JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      - name: Pausa de sincronización para MySQL
+        run: sleep 10
+      - name: Ejecutar test del backend
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/innovatech_db?useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD:
+          
+          DB_PORT: 3306
+          DB_NAME: innovatech_db
+          DB_USERNAME: root
+          DB_PASSWORD:
+          DATASOURCE_URL: jdbc:mysql://localhost:3306/innovatech_db?useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true
+        run: |
+          mvn clean test
+  # ======================= #
+  # BACKEND VENTAS BUILDING #
+  # ======================= #
+  back-Venta-build:
+    needs: back-Venta-test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./back-Ventas_SpringBoot/Springboot-API-REST
+    steps:
+      - name: Checkout repository (git clone)
+        uses: actions/checkout@v4
+      - name: Config JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      - name: Empaquetar Aplicación del front
+        run: mvn clean package -DskipTests
+  # ========================= #
+  # BACKEND DESPACHOS TESTING #
+  # ========================= #
+  back-Despacho-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: innovatech_despachos_db
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+    steps:
+      - name: Checkout repository (git clone)
+        uses: actions/checkout@v4
+      - name: Config JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      - name: Pausa de sincronización para MySQL
+        run: sleep 10
+      - name: Ejecutar test del backend
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          DB_PORT: 3306
+          DB_NAME: innovatech_db
+          DB_USERNAME: root
+          DB_PASSWORD:
+          DATASOURCE_URL: jdbc:mysql://localhost:3306/innovatech_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&createDatabaseIfNotExist=true
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/innovatech_db?useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD:
+          
+        run: |
+          mvn clean test -Dspring.profiles.active=test
+  # ========================== #
+  # BACKEND DESPACHOS BUILDING #
+  # ========================== #
+  back-Despacho-build:
+    needs: back-Despacho-test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+    steps:
+      - name: Checkout repository (git clone)
+        uses: actions/checkout@v4
+      - name: Config JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      - name: Empaquetar Aplicación
+        run: mvn clean package -DskipTests
+  # ================== #
+  # FASE 2: DESPLIEGUE #
+  # ================== #
+
+  deploy:
+    needs: [front-build, back-Venta-build, back-Despacho-build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository (git clone)
+        uses: actions/checkout@v4
+
+      - name: Configurar las credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login en ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Inyectar IP del Backend en la plantilla de Nginx
+        run: |
+          cd ./front_despacho
+          sed -i "s/__BACKEND_IP__/${{ secrets.EC2_BACKEND_HOST }}/g" nginx.conf
+
+      - name: Build and Push Docker Images
+        run: |
+          
+          # Ventas
+          docker build -t ${{ secrets.AWS_ECR_REGISTRY }}/innovatech-ventas:latest ./back-Ventas_SpringBoot/Springboot-API-REST
+          docker push ${{ secrets.AWS_ECR_REGISTRY }}/innovatech-ventas:latest
+
+          # Despachos
+          docker build -t ${{ secrets.AWS_ECR_REGISTRY }}/innovatech-despachos:latest ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+          docker push ${{ secrets.AWS_ECR_REGISTRY }}/innovatech-despachos:latest
+
+          # Frontend
+          docker build -t ${{ secrets.AWS_ECR_REGISTRY }}/innovatech-frontend:latest ./front_despacho
+          docker push ${{ secrets.AWS_ECR_REGISTRY }}/innovatech-frontend:latest
+
+      - name: Despliegue en EC2 Pública (Frontend)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_FRONTEND_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ECR_REGISTRY }}
+            docker pull ${{ secrets.AWS_ECR_REGISTRY }}/innovatech-frontend:latest
+
+            docker stop web-front || true
+            docker rm web-front || true
+
+            docker run -d --restart always \
+              -p 8083:8083 \
+              --add-host backend-ventas:${{ secrets.EC2_BACKEND_HOST }} \
+              --add-host backend-despachos:${{ secrets.EC2_BACKEND_HOST }} \
+              --name web-front ${{ secrets.AWS_ECR_REGISTRY }}/innovatech-frontend:latest
+
+      - name: Codificar archivos necesarios
+        id: read_files
+        run: |
+          COMP_BASE64=$(base64 -w 0 docker-compose.yml)
+          echo "codigo_limpio=$COMP_BASE64" >> $GITHUB_OUTPUT
+
+          echo "mysql_init=$(base64 -w 0 db/init.sql)" >> $GITHUB_OUTPUT
+
+      - name: Despliegue en EC2 Privada (Backend & Módulos)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_BACKEND_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          proxy_host: ${{ secrets.EC2_FRONTEND_HOST }}
+          proxy_username: ec2-user
+          proxy_key: ${{ secrets.EC2_SSH_KEY }}
+          proxy_port: 22
+          script: |
+            mkdir -p /home/ec2-user/innovatech-project
+            cd /home/ec2-user/innovatech-project
+
+            echo "Limpiando directorio de trabajo..."
+            sudo rm -rf /home/ec2-user/innovatech-project
+            mkdir -p /home/ec2-user/innovatech-project
+            cd /home/ec2-user/innovatech-project
+
+            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ECR_REGISTRY }}
+
+            echo "Escribiendo docker-compose.yml desde Base64..."
+            echo "${{ steps.read_files.outputs.codigo_limpio }}" | base64 -d > docker-compose.yml
+
+            mkdir -p db
+            echo "${{ steps.read_files.outputs.mysql_init }}" | base64 -d > db/init.sql
+
+            echo "AWS_ECR_REGISTRY=${{ secrets.AWS_ECR_REGISTRY }}" > .env
+
+            echo "Aplicando permisos de escritura para MySQL..."
+            sudo chmod -R 777 /home/ec2-user/innovatech-project
+
+            echo "Descargando imágenes desde AWS ECR..."
+            docker compose pull backend-ventas backend-despachos
+
+            echo "Limpiando contenedores o volúmenes huérfanos..."
+            docker compose down --volumes --remove-orphans || true
+
+            echo "Levantando la infraestructura Innovatech..."
+            docker compose up -d --remove-orphans

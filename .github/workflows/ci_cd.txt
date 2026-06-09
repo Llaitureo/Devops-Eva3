@@ -1,3 +1,6 @@
+  # ============== #
+  # LEGACY VERSION #
+  # ============== #
 name: CI/CD Pipeline
 # Acciones que ejecutan el archivo
 on:

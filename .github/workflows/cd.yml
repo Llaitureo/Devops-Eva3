@@ -12,12 +12,16 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      CLUSTER_NAME: innovatech-cluster
+      TAG_VERSION: ${{ github.sha }}
     steps:
       - name: Checkout repository (git clone)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Configurar las credenciales de AWS
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v3
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -28,90 +32,94 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Inyectar IP del Backend en la plantilla de Nginx
+      - name: Rescatar el AWS Account ID
         run: |
-          cd ./front_despacho
-          sed -i "s/__BACKEND_IP__/${{ secrets.EC2_BACKEND_HOST }}/g" nginx.conf
+          echo "ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
 
-      - name: Build and Push Docker Images
+      - name: Definir las URL de los ECR
         run: |
-          
-          # Ventas
-          docker build -t ${{ secrets.AWS_ECR_REGISTRY }}/innovatech-ventas:latest ./back-Ventas_SpringBoot/Springboot-API-REST
-          docker push ${{ secrets.AWS_ECR_REGISTRY }}/innovatech-ventas:latest
+          # ventas
+          echo "BACKEND_VENTA_ECR=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/innovatech-ventas" >> $GITHUB_ENV
 
-          # Despachos
-          docker build -t ${{ secrets.AWS_ECR_REGISTRY }}/innovatech-despachos:latest ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
-          docker push ${{ secrets.AWS_ECR_REGISTRY }}/innovatech-despachos:latest
+          # despachos
+          echo "BACKEND_DESPACHO_ECR=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/innovatech-despachos" >> $GITHUB_ENV
 
-          # Frontend
-          docker build -t ${{ secrets.AWS_ECR_REGISTRY }}/innovatech-frontend:latest ./front_despacho
-          docker push ${{ secrets.AWS_ECR_REGISTRY }}/innovatech-frontend:latest
-
-      - name: Despliegue en EC2 Pública (Frontend)
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_FRONTEND_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ECR_REGISTRY }}
-            docker pull ${{ secrets.AWS_ECR_REGISTRY }}/innovatech-frontend:latest
-
-            docker stop web-front || true
-            docker rm web-front || true
-
-            docker run -d --restart always \
-              -p 8083:8083 \
-              --add-host backend-ventas:${{ secrets.EC2_BACKEND_HOST }} \
-              --add-host backend-despachos:${{ secrets.EC2_BACKEND_HOST }} \
-              --name web-front ${{ secrets.AWS_ECR_REGISTRY }}/innovatech-frontend:latest
-
-      - name: Codificar archivos necesarios
-        id: read_files
+          # frontend
+          echo "FRONTEND_ECR=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/front_despachos" >> $GITHUB_ENV
+      
+      - name: Build Docker Imagen venta
         run: |
-          COMP_BASE64=$(base64 -w 0 docker-compose.yml)
-          echo "codigo_limpio=$COMP_BASE64" >> $GITHUB_OUTPUT
+          docker buildx build \
+          --platform linux/amd64 \
+          -t $BACKEND_VENTA_ECR:${GITHUB_SHA} \
+          ./back-Ventas_SpringBoot/Springboot-API-REST \
+          --load
 
-          echo "mysql_init=$(base64 -w 0 db/init.sql)" >> $GITHUB_OUTPUT
+      - name: Build Docker Imagen despacho
+        run: |
+          docker buildx build \
+          --platform linux/amd64 \
+          -t $BACKEND_DESPACHO_ECR:${GITHUB_SHA} \
+          ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO \
+          --load
 
-      - name: Despliegue en EC2 Privada (Backend & Módulos)
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_BACKEND_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          proxy_host: ${{ secrets.EC2_FRONTEND_HOST }}
-          proxy_username: ec2-user
-          proxy_key: ${{ secrets.EC2_SSH_KEY }}
-          proxy_port: 22
-          script: |
-            mkdir -p /home/ec2-user/innovatech-project
-            cd /home/ec2-user/innovatech-project
+      - name: Build Docker Imagen frontend
+        run: |
+          docker buildx build \
+          --platform linux/amd64 \
+          -t $FRONTEND_ECR:${GITHUB_SHA} \
+          ./front_despacho \
+          --load
 
-            echo "Limpiando directorio de trabajo..."
-            sudo rm -rf /home/ec2-user/innovatech-project
-            mkdir -p /home/ec2-user/innovatech-project
-            cd /home/ec2-user/innovatech-project
+      - name: Push de imagen backend ventas
+        run: |
+          docker push $BACKEND_VENTA_ECR:${GITHUB_SHA}
 
-            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ECR_REGISTRY }}
+      - name: Push de imagen backend despachos
+        run: |
+          docker push $BACKEND_DESPACHO_ECR:${GITHUB_SHA}
 
-            echo "Escribiendo docker-compose.yml desde Base64..."
-            echo "${{ steps.read_files.outputs.codigo_limpio }}" | base64 -d > docker-compose.yml
+      - name: Push de imagen frontend
+        run: |
+          docker push $FRONTEND_ECR:${GITHUB_SHA}
+      
+      - name: Instalar kubectl
+        uses: azure/setup-kubectl@v4
+      - name: Configurar EKS a través de GitHub ACtions
+        run: |
+          aws eks update-kubeconfig \
+            --region $AWS_REGION \
+            --name $CLUSTER_NAME
+      - name: Aplicar los manifiestos de kubernet
+        run: |
+          kubectl apply -f infra/k8s/
 
-            mkdir -p db
-            echo "${{ steps.read_files.outputs.mysql_init }}" | base64 -d > db/init.sql
+      - name: Actualizar nombre de la imagen del backend ventas en el deployment de Kubernetes
+        run: |
+          kubectl set image deployment/backend-ventas \
+            backend=$BACKEND_VENTA_ECR:${GITHUB_SHA}
 
-            echo "AWS_ECR_REGISTRY=${{ secrets.AWS_ECR_REGISTRY }}" > .env
+      - name: Actualizar nombre de la imagen del backend despachos en el deployment de Kubernetes
+        run: |
+          kubectl set image deployment/backend-despachos \
+            backend=$BACKEND_DESPACHO_ECR:${GITHUB_SHA}
 
-            echo "Aplicando permisos de escritura para MySQL..."
-            sudo chmod -R 777 /home/ec2-user/innovatech-project
+      - name: Actualizar nombre de la imagen del frontend en el deployment de Kubernetes
+        run: |
+          kubectl set image deployment/frontend-despacho \
+            frontend=$FRONTEND_ECR:${GITHUB_SHA}
 
-            echo "Descargando imágenes desde AWS ECR..."
-            docker compose pull backend-ventas backend-despachos
+# =================================== #
+# Recomendación: Fix a docker compose #
+# =================================== #
 
-            echo "Limpiando contenedores o volúmenes huérfanos..."
-            docker compose down --volumes --remove-orphans || true
+# - name: Correción de docker-compose TAG_VERSION
+#   run: |
+#     sed -i "s/\${TAG_VERSION:-latest}/\${GITHUB_SHA}/g" docker-compose.yml
+# - name: Correción de docker-compose
+#   run: |
+#     echo "AWS_ECR_REGISTRY=${ACCOUNT_ID}.dkr.ecr.${ env.AWS_REGION }.amazonaws.com" > ./.env
 
-            echo "Levantando la infraestructura Innovatech..."
-            docker compose up -d --remove-orphans
+#PD: Se deberia aplicar en el caso de que se quiera ejecutar el docker-compose,
+#    pero en este caso se esta utilizando kubernetes para el despliegue,
+#    por lo que no es necesario modificar el docker-compose.yml y de forma EC2 (ci_cd.txt (Legacy version)).

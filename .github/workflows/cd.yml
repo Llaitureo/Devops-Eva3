@@ -45,7 +45,7 @@ jobs:
           echo "BACKEND_DESPACHO_ECR=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/innovatech-despachos" >> $GITHUB_ENV
 
           # frontend
-          echo "FRONTEND_ECR=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/front_despachos" >> $GITHUB_ENV
+          echo "FRONTEND_ECR=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/front-despachos" >> $GITHUB_ENV
       
       - name: Build Docker Imagen venta
         run: |

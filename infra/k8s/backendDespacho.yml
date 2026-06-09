@@ -32,6 +32,13 @@ spec:
         - name: backend-despachos
           image: imagen-backendDespachos
           imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "100m"      # Mínimo asignado
+              memory: "128Mi"  # Mínimo de memoria
+            limits:
+              cpu: "500m"      # Máximo permitido
+              memory: "512Mi"  # Máximo de memoria
           ports:
             - containerPort: 8082
           env:

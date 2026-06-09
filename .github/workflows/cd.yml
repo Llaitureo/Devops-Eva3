@@ -97,17 +97,17 @@ jobs:
       - name: Actualizar nombre de la imagen del backend ventas en el deployment de Kubernetes
         run: |
           kubectl set image deployment/backend-ventas \
-            backend=$BACKEND_VENTA_ECR:${GITHUB_SHA}
+            backend-ventas=$BACKEND_VENTA_ECR:${GITHUB_SHA}
 
       - name: Actualizar nombre de la imagen del backend despachos en el deployment de Kubernetes
         run: |
           kubectl set image deployment/backend-despachos \
-            backend=$BACKEND_DESPACHO_ECR:${GITHUB_SHA}
+            backend-despachos=$BACKEND_DESPACHO_ECR:${GITHUB_SHA}
 
       - name: Actualizar nombre de la imagen del frontend en el deployment de Kubernetes
         run: |
           kubectl set image deployment/frontend-despacho \
-            frontend=$FRONTEND_ECR:${GITHUB_SHA}
+            frontend-despacho=$FRONTEND_ECR:${GITHUB_SHA}
 
 # =================================== #
 # Recomendación: Fix a docker compose #

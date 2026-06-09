@@ -33,5 +33,5 @@ variable "back_despacho_ecr_repo_name" {
 }
 
 variable "front_despacho_ecr_repo_name" {
-  default = "front_despachos"
+  default = "front-despachos"
 }

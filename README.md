@@ -8,7 +8,7 @@ InnovaTech es una solución de software empresarial basada en una arquitectura d
 
 El ecosistema de la aplicación se divide en componentes independientes distribuidos en sus respectivas capas tecnológicas:
 
-### 📂 Infraestructura del proyecto
+### 📂 Infraestructura del proyecto **(v2.0)**
 
 ````text
 PROYECTO SEMESTRAL/
@@ -66,16 +66,23 @@ Todos los contenedores de la capa lógica se comunican de forma aislada a travé
 
 ## ☁️ Modo de Trabajo de la Infraestructura (AWS & Terraform)
 
-La topología de red y los recursos en la nube se encuentran aprovisionados de manera modular a través de archivos de configuración de Terraform:
+- **Migración a Kubernetes:** Sustitución de Docker Compose por manifiestos declarativos de Kubernetes (`Deployments`, `Services`, `ConfigMaps` y `Secrets`).
+- **Infraestructura Modular Multi-AZ:** Rediseño completo de la topología de red utilizando Terraform para implementar Alta Disponibilidad real distribuyendo cargas en múltiples zonas de disponibilidad (`us-east-1a` y `us-east-1b`).
+- **Sincronización Asíncrona Nativa:** Reemplazo de las políticas `depends_on` mediante la implementación de `initContainers` en los Pods de Kubernetes.
+- **Escalado Horizontal Automático (HPA):** Autoescalado dinámico configurado a través de métricas de CPU en tiempo real.
+- **Gobernanza CI/CD Automatizada:** Integración total de GitOps mediante pipelines controlados en GitHub Actions asociados estrictamente a la rama `deploy`.
 
-- **`main.tf`:** Inicialización de proveedores cloud y configuraciones principales de la arquitectura global.
-- **`network.tf`:** Declaración de la VPC, creación de subredes públicas (Frontend) y subredes privadas (Backend), tablas de ruteo e Internet Gateway / NAT Gateway para aislar los entornos de datos.
-- **`security.tf`:** Definición de las reglas de firewalls lógicos mediante *Security Groups*. Implementa el principio de mínimo privilegio restringiendo el acceso del Backend únicamente al tráfico proveniente del balanceador o del Frontend (`web_sg` encadenado a `backend_sg`).
-- **`compute.tf`:** Configuración de las plantillas de lanzamiento (*Launch Templates*) e instancias EC2 destinadas a ejecutar los entornos de contenedores Docker.
-- **`iam.tf`:** Asignación de permisos y perfiles de instancia específicos (como las políticas de AWS Systems Manager `AmazonSSMManagedInstanceCore`) para administrar los recursos sin exponer claves de acceso públicas.
-- **`variables.tf` y `outputs.tf`:** Parametrización dinámica del entorno para mitigar datos estáticos y exportación de direcciones IP o DNS clave.
+---
 
-Además, debido a los límites de hardware propios de la capa gratuita, la instancia de Backend cuenta con una optimización del sistema operativo mediante la adición de **2 GB de memoria Swap virtual**, previniendo que los microservicios Java sean detenidos de forma abrupta por el gestor de memoria física (*OOM Killer*).
+## 📐 Arquitectura de Infraestructura y Red
+
+La topología de red fue calculada meticulosamente para soportar el crecimiento dinámico de los microservicios sin sufrir agotamiento de direccionamiento IP:
+
+- **VPC Principal:** Direccionamiento base `10.0.0.0/16`.
+- **Subredes Públicas (2x `/24`):** Ubicadas en zonas de disponibilidad redundantes, dedicadas de forma exclusiva al aprovisionamiento de los **AWS Classic Load Balancers (CLB)**.
+- **Subredes Privadas (2x `/20`):** Bloques masivos que proveen hasta ~4,091 IPs usables por zona, diseñadas para mitigar la pre-asignación agresiva de IPs que realiza el driver *AWS VPC CNI* para los Pods del clúster.
+- **Redundancia NAT:** Implementación de **dos NAT Gateways independientes** (uno por cada AZ). Si una zona de disponibilidad experimenta una falla total en los centros de datos de AWS, la zona secundaria mantiene salida autónoma a internet para los nodos de cómputo.
+- **Cómputo Seguro:** Nodos trabajadores administrados utilizando instancias `t3.medium` ubicados estrictamente dentro del perímetro privado de la VPC.
 
 ---
 
@@ -84,7 +91,7 @@ Además, debido a los límites de hardware propios de la capa gratuita, la insta
 El ciclo de vida del código se encuentra completamente automatizado mediante un pipeline unificado que se activa ante eventos en ramas de integración:
 
 ```text
-[Fase 1: Integración (Tests & Builds)] ──> [Fase 2: Registro (ECR)] ──> [Fase 3: Despliegue (EC2 vía SSH Proxy)]
+[Fase 1: Integración (Tests & Builds)] ──> [Fase 2: Registro (ECR)] ──> [Fase 3: Despliegue (EKS)]
 ```
 
 ---
@@ -95,7 +102,7 @@ El despliege continuo poseen **secrets**. Esto influye en como se escribe el có
 
 **CD**
 
-1. Configuraciones para el proceso **terraform apply**
+Configuraciones para el proceso **terraform apply**
 
 | Nombre secreto | Uso |
 |----------------|-----|
@@ -104,15 +111,41 @@ El despliege continuo poseen **secrets**. Esto influye en como se escribe el có
 | AWS_SESSION_TOKEN | Token de paso para la cuenta. |
 | AWS_REGION | Region en donde está parada la cuenta. |
 
-2. dependientes del proceso **terraform apply** / *Outputs de Terminal*
-
-| Nombre secreto | Tipo | Uso |
-|----------------|------|-----|
-| EC2_FRONTEND_HOST | Dependiente | Ip exacta de la instancia front_server (Ver en consola AWS). |
-| EC2_BACKEND_HOST | Dependiente | Ip exacta de la instancia back_server (Ver en consola AWS). |
-| EC2_SSH_KEY | Dependiente | Llave con la cual se usa para crear las máquinas (Crear en consola AWS). |
-| AWS_ECR_REGISTRY | Output Terminal | Url que ayuda a dirigir el destino de las imagenes a sus repositorios en aws, o sus nombres (Docker-compose). |
-
 Sin esto, el despliege continuo no será capaz de levantar el proyecto en AWS.
 
-> *PD: El nombre de la llave debe ser `devops-u2.pem` en variables.tf, o estará sujeta a cambios.*
+---
+
+# Comandos para el Despliegue y funcionamiento óptimo
+
+## 📐 Fase 0 -> **AWS CLI**
+
+Aquí se listarán los comandos para configurar aws cli y a si mismo, terraform.
+
+``aws configure`` -> este comando pedirá los datos de aws details. Estos deben coincidir con aws y los environment de Github secrets.
+
+## ⚙️ Fase 1 -> **Terraform**
+
+Aquí se listarán en orden los comandos necesarios para el Proceso de terraform:
+
+1. ``cd infra/terraform/kubeForm`` -> ingresa a la carpeta a ejecutar (ec2Form para la **v1.0**).
+2. ``terraform init`` -> inicia terraform según la versión planteada en main.tf
+3. ``terraform plan`` -> (opcional) lista los objetos para aplicar en aws.
+4. ``terraform apply`` -> Aplica el listado de objetos.
+
+## ☁️ Fase 2 -> **Kubectl**
+
+Algunos de estos comandos son opcionales, pero en cierto punto, necesarios para ver el estado de los nodos y pods.
+
+Para esto, es necesario tener activo Docker Desktop con Kubernetes.
+
+1. ``aws eks update-kubeconfig --region us-east-1 --name innovatech-cluster`` -> Cambia la dirección de preguntas de la terminal hacia AWS.
+2. ``kubectl get hpa`` -> Sirve para confirmar que el clúster quedó listo para soportar el estrés de la entrega.
+3. ``kubectl get svc`` -> Sirve para visualizar los servicios (Como el DNS del Front).
+
+### 🚀 Recomendaciones
+
+Para abrir el DNS del front correctamente, usa este formato:
+
+``http://<DNS_FRONT>:8083``
+
+> *PD: El :8083 es donde nginx está escuchando.*

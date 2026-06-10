@@ -1,0 +1,125 @@
+# ================== #
+# FASE 2: DESPLIEGUE #
+# ================== #
+name: CD - Deploy
+on:
+  push:
+    branches:
+      - deploy
+  pull_request:
+    branches:
+      - deploy
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      CLUSTER_NAME: innovatech-cluster
+      TAG_VERSION: ${{ github.sha }}
+    steps:
+      - name: Checkout repository (git clone)
+        uses: actions/checkout@v3
+
+      - name: Configurar las credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login en ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Rescatar el AWS Account ID
+        run: |
+          echo "ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
+
+      - name: Definir las URL de los ECR
+        run: |
+          # ventas
+          echo "BACKEND_VENTA_ECR=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/innovatech-ventas" >> $GITHUB_ENV
+
+          # despachos
+          echo "BACKEND_DESPACHO_ECR=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/innovatech-despachos" >> $GITHUB_ENV
+
+          # frontend
+          echo "FRONTEND_ECR=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/front-despachos" >> $GITHUB_ENV
+      
+      - name: Build Docker Imagen venta
+        run: |
+          docker buildx build \
+          --platform linux/amd64 \
+          -t $BACKEND_VENTA_ECR:${GITHUB_SHA} \
+          ./back-Ventas_SpringBoot/Springboot-API-REST \
+          --load
+
+      - name: Build Docker Imagen despacho
+        run: |
+          docker buildx build \
+          --platform linux/amd64 \
+          -t $BACKEND_DESPACHO_ECR:${GITHUB_SHA} \
+          ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO \
+          --load
+
+      - name: Build Docker Imagen frontend
+        run: |
+          docker buildx build \
+          --platform linux/amd64 \
+          -t $FRONTEND_ECR:${GITHUB_SHA} \
+          ./front_despacho \
+          --load
+
+      - name: Push de imagen backend ventas
+        run: |
+          docker push $BACKEND_VENTA_ECR:${GITHUB_SHA}
+
+      - name: Push de imagen backend despachos
+        run: |
+          docker push $BACKEND_DESPACHO_ECR:${GITHUB_SHA}
+
+      - name: Push de imagen frontend
+        run: |
+          docker push $FRONTEND_ECR:${GITHUB_SHA}
+      
+      - name: Instalar kubectl
+        uses: azure/setup-kubectl@v4
+      - name: Configurar EKS a través de GitHub ACtions
+        run: |
+          aws eks update-kubeconfig \
+            --region $AWS_REGION \
+            --name $CLUSTER_NAME
+      - name: Aplicar los manifiestos de kubernet
+        run: |
+          kubectl apply -f infra/k8s/
+
+      - name: Actualizar nombre de la imagen del backend ventas en el deployment de Kubernetes
+        run: |
+          kubectl set image deployment/backend-ventas \
+            backend-ventas=$BACKEND_VENTA_ECR:${GITHUB_SHA}
+
+      - name: Actualizar nombre de la imagen del backend despachos en el deployment de Kubernetes
+        run: |
+          kubectl set image deployment/backend-despachos \
+            backend-despachos=$BACKEND_DESPACHO_ECR:${GITHUB_SHA}
+
+      - name: Actualizar nombre de la imagen del frontend en el deployment de Kubernetes
+        run: |
+          kubectl set image deployment/frontend-despacho \
+            frontend-despacho=$FRONTEND_ECR:${GITHUB_SHA}
+
+# =================================== #
+# Recomendación: Fix a docker compose #
+# =================================== #
+
+# - name: Correción de docker-compose TAG_VERSION
+#   run: |
+#     sed -i "s/\${TAG_VERSION:-latest}/\${GITHUB_SHA}/g" docker-compose.yml
+# - name: Correción de docker-compose
+#   run: |
+#     echo "AWS_ECR_REGISTRY=${ACCOUNT_ID}.dkr.ecr.${ env.AWS_REGION }.amazonaws.com" > ./.env
+
+#PD: Se deberia aplicar en el caso de que se quiera ejecutar el docker-compose,
+#    pero en este caso se esta utilizando kubernetes para el despliegue,
+#    por lo que no es necesario modificar el docker-compose.yml y de forma EC2 (ci_cd.txt (Legacy version)).

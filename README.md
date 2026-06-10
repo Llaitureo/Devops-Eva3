@@ -21,11 +21,10 @@ PROYECTO SEMESTRAL/
 ├── front_despacho/
 │   └── nginx.conf
 ├── infra/
-|   ├── main.tf
-│   ├── compute.tf
-│   ├── network.tf
-│   ├── security.tf
-│   └── variables.tf
+|   ├── k8s/
+|   ├── terraform/
+|   |   └── ec2Form/
+|   |   └── kubeForm/
 ├── .env
 ├── .gitignore
 └── docker-compose.yml

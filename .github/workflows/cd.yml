@@ -109,6 +109,25 @@ jobs:
           kubectl set image deployment/frontend-despacho \
             frontend-despacho=$FRONTEND_ECR:${GITHUB_SHA}
 
+      - name: Obtener URL del Load Balancer del Frontend
+        run: |
+          echo "Esperando a que AWS asigne la URL pública al Load Balancer..."
+          sleep 15
+          
+          LB_URL=""
+          
+          while [ -z "$LB_URL" ]; do
+            echo "Consultando DNS del balanceador..."
+            LB_URL=$(kubectl get svc frontend-despacho -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            [ -z "$LB_URL" ] && sleep 10
+          done
+          
+          echo "================================================================="
+          echo " ¡DESPLIEGUE COMPLETADO EXITOSAMENTE!"
+          echo " Accede a tu Frontend en la siguiente dirección:"
+          echo " http://$LB_URL:8083"
+          echo "================================================================="
+
 # =================================== #
 # Recomendación: Fix a docker compose #
 # =================================== #

@@ -6,8 +6,9 @@ COPY . .
 RUN npm run build
 
 FROM nginxinc/nginx-unprivileged:alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+ENV ENTORNO=prod
+COPY nginx.conf /tmp/nginx.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 EXPOSE 8083
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/bin/sh", "-c", "envsubst '${ENTORNO}' < /tmp/nginx.conf > /tmp/default.conf && exec nginx -c /tmp/default.conf -g 'daemon off;'"]

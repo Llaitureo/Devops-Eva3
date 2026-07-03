@@ -12,5 +12,5 @@ RUN apk add --no-cache curl
 COPY --from=builder /build/target/*.jar app.jar
 RUN chown -R appuser:appgroup /app
 USER appuser:appgroup
-EXPOSE 8082
+EXPOSE 8084
 ENTRYPOINT ["java","-jar","app.jar"]

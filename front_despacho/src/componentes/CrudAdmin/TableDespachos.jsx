@@ -6,7 +6,7 @@ import Swal from "sweetalert2";
 
 export const API_DESPACHOS = import.meta.env.PROD
   ? '/api/v1/despachos'
-  : 'http://localhost:8082/v1/despachos';
+  : 'http://localhost:8084/api/v1/despachos';
 const url = `${API_DESPACHOS}`;
 
 export const TableDespachos = () => {

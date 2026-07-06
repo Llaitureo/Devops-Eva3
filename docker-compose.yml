@@ -19,11 +19,14 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - back-net
+      - app-net
 
   backend-ventas:
-    image: ${AWS_ECR_REGISTRY}/innovatech-ventas:${TAG_VERSION:-latest}
+    image: innovatech-ventas:${TAG_VERSION:-latest}
     container_name: innovatech-project-backend-ventas
+    build: 
+      context: ./back-Ventas_SpringBoot/Springboot-API-REST/
+      dockerfile: Dockerfile
     ports:
       - "8081:8081"
     user: "${CURRENT_UID:-1000}:${CURRENT_GID:-1000}"
@@ -43,12 +46,15 @@ services:
       retries: 3
       start_period: 40s
     networks:
-      - back-net
+      - app-net
   backend-despachos:
-    image: ${AWS_ECR_REGISTRY}/innovatech-despachos:${TAG_VERSION:-latest}
+    image: innovatech-despachos:${TAG_VERSION:-latest}
     container_name: innovatech-project-backend-despachos
+    build:
+      context: ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+      dockerfile: Dockerfile
     ports:
-      - "8082:8082"
+      - "8084:8084"
     user: "${CURRENT_UID:-1000}:${CURRENT_GID:-1000}"
     environment:
       DATASOURCE_URL: jdbc:mysql://mysql:3306/${DB_NAME:-innovatech_db}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&createDatabaseIfNotExist=true
@@ -62,16 +68,31 @@ services:
       backend-ventas:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/swagger-ui.html"]
+      test: ["CMD", "curl", "-f", "http://localhost:8084/swagger-ui.html"]
       interval: 20s
       timeout: 5s
       retries: 3
       start_period: 40s
     networks:
-      - back-net
+      - app-net
+  frontend-service:
+    image: innovatech-front_despacho:${TAG_VERSION:-latest}
+    container_name: innovatech-project-front-despachos
+    build: 
+        context: ./front_despacho
+        dockerfile: Dockerfile
+    ports:
+      - "8083:8083"
+    environment:
+      - ENTORNO=local
+    depends_on:
+      backend-despachos:
+        condition: service_healthy
+    networks:
+      - app-net
 volumes:
   mysql_data:
 
 networks:
-  back-net:
+  app-net:
     driver: bridge

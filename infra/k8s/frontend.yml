@@ -18,6 +18,9 @@ spec:
         - name: frontend-despacho
           image: imagen-frontend
           imagePullPolicy: Always
+          env:
+            - name: ENTORNO
+              value: "prod"
           resources:
             requests:
               cpu: "100m"

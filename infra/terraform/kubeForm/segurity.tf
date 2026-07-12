@@ -5,7 +5,7 @@ resource "aws_security_group_rule" "sg_frontend_nodeport" {
   to_port           = 30080
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"] 
-  security_group_id = aws_eks_node_group.workers.resources[0].remote_access_security_group_id
+  security_group_id = aws_eks_cluster.eks.vpc_config[0].cluster_security_group_id
 }
 
 resource "aws_security_group_rule" "sg_backend_ventas" {
@@ -14,7 +14,7 @@ resource "aws_security_group_rule" "sg_backend_ventas" {
   to_port           = 8081
   protocol          = "tcp"
   cidr_blocks       = [var.vpc_cidr]
-  security_group_id = aws_eks_node_group.workers.resources[0].remote_access_security_group_id
+  security_group_id = aws_eks_cluster.eks.vpc_config[0].cluster_security_group_id
 }
 
 resource "aws_security_group_rule" "sg_backend_despachos" {
@@ -23,5 +23,5 @@ resource "aws_security_group_rule" "sg_backend_despachos" {
   to_port           = 8082
   protocol          = "tcp"
   cidr_blocks       = [var.vpc_cidr]
-  security_group_id = aws_eks_node_group.workers.resources[0].remote_access_security_group_id
+  security_group_id = aws_eks_cluster.eks.vpc_config[0].cluster_security_group_id
 }

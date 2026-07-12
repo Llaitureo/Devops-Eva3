@@ -8,7 +8,7 @@ InnovaTech es una solución de software empresarial basada en una arquitectura d
 
 El ecosistema de la aplicación se divide en componentes independientes distribuidos en sus respectivas capas tecnológicas:
 
-### 📂 Infraestructura del proyecto **(v2.0)**
+### 📂 Infraestructura del proyecto **(v5.0)**
 
 ````text
 PROYECTO SEMESTRAL/
@@ -93,6 +93,14 @@ El ciclo de vida del código se encuentra completamente automatizado mediante un
 ```text
 [Fase 1: Integración (Tests & Builds)] ──> [Fase 2: Registro (ECR)] ──> [Fase 3: Despliegue (EKS)]
 ```
+
+El estado del despliegue y la salud del ciclo de integración se monitorean 
+activamente a través de los logs de ejecución integrados en GitHub Actions, 
+los cuales certifican la correcta compilación, empaquetado y entrega de cada 
+microservicio en la nube. Así mismo, la infraestructura en AWS cuenta con 
+soporte de Amazon CloudWatch, lo que permite realizar un seguimiento en 
+tiempo real de las métricas de rendimiento (uso de CPU y memoria) en los 
+nodos trabajadores del clúster EKS.
 
 ---
 

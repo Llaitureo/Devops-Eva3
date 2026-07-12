@@ -18,8 +18,8 @@ spec:
           command: ['sh', '-c', 'until nc -z -w 2 mysql 3306; do echo waiting for mysql; sleep 2; done;']
       containers:
         - name: backend-ventas
-          image: imagen-backendVentas
-          imagePullPolicy: Always
+          image: innovatech-ventas
+          imagePullPolicy: IfNotPresent
           resources:
             requests:
               cpu: "100m"
@@ -30,6 +30,8 @@ spec:
           ports:
             - containerPort: 8081
           env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
             - name: DB_NAME
               valueFrom:
                 secretKeyRef:
@@ -53,18 +55,18 @@ spec:
           # --- CONFIGURACIÓN DE HEALTH CHECKS (ACTUATOR) ---
           livenessProbe:
             httpGet:
-              path: /actuator/health/liveness
+              path: /actuator/health
               port: 8081
-            initialDelaySeconds: 40
+            initialDelaySeconds: 120
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 3
             
           readinessProbe:
             httpGet:
-              path: /actuator/health/readiness
+              path: /actuator/health
               port: 8081
-            initialDelaySeconds: 45
+            initialDelaySeconds: 130
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 2

@@ -16,8 +16,8 @@ spec:
     spec:
       containers:
         - name: frontend-despacho
-          image: imagen-frontend
-          imagePullPolicy: Always
+          image: innovatech-front_despacho
+          imagePullPolicy: IfNotPresent
           env:
             - name: ENTORNO
               value: "prod"
@@ -30,6 +30,14 @@ spec:
               memory: "512Mi"
           ports:
             - containerPort: 8083
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/nginx/nginx.conf
+              subPath: default.conf
+      volumes:
+      - name: config-volume
+        configMap:
+          name: nginx-config
 ---
 apiVersion: v1
 kind: Service

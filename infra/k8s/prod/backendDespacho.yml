@@ -30,8 +30,8 @@ spec:
 
       containers:
         - name: backend-despachos
-          image: imagen-backendDespachos
-          imagePullPolicy: Always
+          image: innovatech-despachos
+          imagePullPolicy: IfNotPresent
           resources:
             requests:
               cpu: "100m"      # Mínimo asignado
@@ -42,6 +42,8 @@ spec:
           ports:
             - containerPort: 8082
           env:
+            - name: SPRING_PROFILES_ACTIVE # Cambiar aqui para probar el cluster local - test
+              value: "prod"
             - name: DB_NAME
               valueFrom:
                 secretKeyRef:
@@ -70,18 +72,18 @@ spec:
           # --- CONFIGURACIÓN DE HEALTH CHECKS (ACTUATOR) ---
           livenessProbe:
             httpGet:
-              path: /actuator/health/liveness
+              path: /actuator/health
               port: 8082
-            initialDelaySeconds: 40
+            initialDelaySeconds: 120
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 3
             
           readinessProbe:
             httpGet:
-              path: /actuator/health/readiness
+              path: /actuator/health
               port: 8082
-            initialDelaySeconds: 45
+            initialDelaySeconds: 130
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 2

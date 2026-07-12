@@ -43,7 +43,7 @@ spec:
             - containerPort: 8082
           env:
             - name: SPRING_PROFILES_ACTIVE # Cambiar aqui para probar el cluster local - test
-              value: "prod"
+              value: "dev"
             - name: DB_NAME
               valueFrom:
                 secretKeyRef:

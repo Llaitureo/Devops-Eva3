@@ -83,14 +83,16 @@ jobs:
       
       - name: Instalar kubectl
         uses: azure/setup-kubectl@v4
-      - name: Configurar EKS a través de GitHub ACtions
+        
+      - name: Configurar EKS a través de GitHub Actions
         run: |
           aws eks update-kubeconfig \
             --region $AWS_REGION \
             --name $CLUSTER_NAME
-      - name: Aplicar los manifiestos de kubernet
+
+      - name: Aplicar los manifiestos de kubernetes
         run: |
-          kubectl apply -f infra/k8s/
+          kubectl apply -f infra/k8s/prod/
 
       - name: Actualizar nombre de la imagen del backend ventas en el deployment de Kubernetes
         run: |
@@ -140,3 +142,14 @@ jobs:
 #PD: Se deberia aplicar en el caso de que se quiera ejecutar el docker-compose,
 #    pero en este caso se esta utilizando kubernetes para el despliegue,
 #    por lo que no es necesario modificar el docker-compose.yml y de forma EC2 (ci_cd.txt (Legacy version)).
+
+# ========== #
+# k8s Config #
+# ========== #
+
+#      - name: Configurar perfiles en los manifiestos
+#        run: |
+#           sed -i 's/value: "test"/value: "prod"/g' infra/k8s/prod/backendVenta.yml
+#           sed -i 's/value: "test"/value: "prod"/g' infra/k8s/prod/backendDespacho.yml
+
+#PD: SOLO si se cambia para probar el cluster de manera local.

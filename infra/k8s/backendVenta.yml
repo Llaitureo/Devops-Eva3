@@ -12,6 +12,10 @@ spec:
       labels:
         app: backend-ventas
     spec:
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z -w 2 mysql 3306; do echo waiting for mysql; sleep 2; done;']
       containers:
         - name: backend-ventas
           image: imagen-backendVentas
@@ -44,7 +48,7 @@ spec:
             - name: DB_PORT
               value: "3306"
             - name: DATASOURCE_URL
-              value: jdbc:mysql://mysql:3306/$(DB_NAME)?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+              value: "jdbc:mysql://mysql:3306/$(DB_NAME)?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
 
           # --- CONFIGURACIÓN DE HEALTH CHECKS (ACTUATOR) ---
           livenessProbe:

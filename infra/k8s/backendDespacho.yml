@@ -61,7 +61,7 @@ spec:
               value: "3306"
             # Construimos la URL usando de forma segura la variable $(DB_NAME)
             - name: DATASOURCE_URL
-              value: jdbc:mysql://mysql:3306/$(DB_NAME)?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+              value: "jdbc:mysql://mysql:3306/$(DB_NAME)?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
 
             # URL del servicio de ventas para que despachos pueda comunicarse con él.
             - name: VENTAS_API_URL

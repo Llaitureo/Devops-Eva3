@@ -4,12 +4,12 @@ import axios from "axios";
 
 export const API_DESPACHOS = import.meta.env.PROD
   ? '/api/v1/despachos'
-  : 'http://localhost:8082/v1/despachos';
+  : 'http://localhost:8084/api/v1/despachos';
 const url = `${API_DESPACHOS}`;
 
 export const API_VENTAS = import.meta.env.PROD
   ? '/api/v1/ventas'
-  : 'http://localhost:8081/v1/ventas';
+  : 'http://localhost:8081/api/v1/ventas';
 
 export const FormDespacho = ({ venta, onClose }) => {
   const { register, handleSubmit, formState: { errors } } = useForm();

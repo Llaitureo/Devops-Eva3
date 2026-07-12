@@ -6,7 +6,7 @@ import axios from "axios";
 
 export const API_VENTAS = import.meta.env.PROD
   ? '/api/v1/ventas'
-  : 'http://localhost:8081/v1/ventas';
+  : 'http://localhost:8081/api/v1/ventas';
 
 export const TableCompras = () => {
   const [ventas, setVentas] = useState([]);
